@@ -25,6 +25,14 @@ logger = logging.getLogger('process_service')
 # Track processing history to avoid redundant work
 processing_history = {}
 
+def clear_processing_history():
+    """Clear the entire processing history"""
+    global processing_history
+    count = len(processing_history)
+    processing_history.clear()
+    logger.info(f"Cleared processing history ({count} entries)")
+    return count
+
 @app.route('/health', methods=['GET'])
 def health_check():
     """Simple health check endpoint"""
@@ -144,7 +152,7 @@ def status():
 
 @app.route('/cleanup', methods=['POST'])
 def cleanup():
-    """Clean up old data files to free disk space"""
+    """Clean up old data files to free disk space and sync processing history"""
     try:
         # Get path parameters
         data = request.get_json() or {}
@@ -172,10 +180,15 @@ def cleanup():
                     except Exception as e:
                         logger.error(f"Failed to delete {dir_path}: {str(e)}")
 
+        # Clear processing history after cleanup
+        removed_entries = clear_processing_history()
+        logger.info(f"Cleared processing history cache of {removed_entries} entries")
+
         return jsonify({
             'success': True,
             'deleted_count': deleted_count,
-            'message': f"Deleted {deleted_count} directories older than {older_than_days} days"
+            'removed_history_entries': removed_entries,
+            'message': f"Deleted {deleted_count} directories older than {older_than_days} days and removed {removed_entries} stale history entries"
         })
 
     except Exception as e:
